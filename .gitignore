@@ -1,0 +1,15 @@
+# Ignore node_modules directory
+node_modules/
+
+# Ignore pdfs directory
+pdfs/
+
+# Ignore screenshots directory
+screenshots/
+
+
+# Ignore macOS system files
+.DS_Store
+
+# Ignore this .gitignore file
+.gitignore
