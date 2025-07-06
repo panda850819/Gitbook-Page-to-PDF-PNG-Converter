@@ -4,7 +4,7 @@ const xml2js = require("xml2js");
 const fs = require("fs");
 const path = require("path");
 
-const URL_GITBOOK = "https://docs.walken.io";
+const URL_GITBOOK = "https://docs.usual.money";
 
 // Function to fetch the sitemap XML and parse it
 async function fetchSitemap(url) {
@@ -14,11 +14,34 @@ async function fetchSitemap(url) {
 
     // Parse the XML sitemap into JSON
     const parsedSitemap = await xml2js.parseStringPromise(sitemapXML);
+    
+    // 檢查是否是 sitemapindex 而不是 urlset
+    if (parsedSitemap.sitemapindex) {
+      console.log("Found sitemap index, fetching individual sitemaps...");
+      const sitemapUrls = parsedSitemap.sitemapindex.sitemap.map(sitemap => sitemap.loc[0]);
+      
+      // 獲取所有子 sitemap 的 URLs
+      const allUrls = [];
+      for (const sitemapUrl of sitemapUrls) {
+        const subUrls = await fetchSitemap(sitemapUrl);
+        if (subUrls) {
+          allUrls.push(...subUrls);
+        }
+      }
+      return allUrls;
+    }
+    
+    if (!parsedSitemap.urlset || !parsedSitemap.urlset.url) {
+      console.log("No urlset.url found in sitemap");
+      return null;
+    }
+    
     const urls = parsedSitemap.urlset.url;
 
     return urls.map((url) => url.loc[0]); // Extract the 'loc' elements (URLs)
   } catch (error) {
     console.error("Error fetching or parsing sitemap:", error);
+    return null;
   }
 }
 
@@ -102,19 +125,24 @@ async function takeFullPagePdf(page, url, outputPath) {
 // Function to group URLs based on their categories (like 'settings', 'android')
 function categorizeUrl(url) {
   const parts = url.split("/");
-  if (parts.length < 5) {
-    console.error(`URL structure is incorrect: ${url}`);
-    return "unknown"; // Return a fallback category
+  
+  // 處理根域名 URL
+  if (parts.length <= 3) {
+    return "root"; // 根域名頁面
   }
-  const category = parts[4]; // Assuming categories are the 5th part of the URL
-  return category; // Return the category name (e.g., 'settings', 'android')
+  
+  // 處理只有一個路徑段的 URL（例如 /start-here）
+  if (parts.length === 4) {
+    return parts[3]; // 第一個路徑段
+  }
+  
+  // 處理有多個路徑段的 URL，使用第二個路徑段作為類別
+  if (parts.length >= 5) {
+    return parts[4]; // 第二個路徑段
+  }
+  
+  return "unknown"; // 備用類別
 }
-// function categorizeUrl(url) {
-//   const parts = url.split("/");
-//   const category = parts[4]; // Assuming categories are the 5th part of the URL
-
-//   return category; // Return the category name (e.g., 'settings', 'android')
-// }
 
 // Main function to run the script
 async function run() {
